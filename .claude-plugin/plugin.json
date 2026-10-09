@@ -1,0 +1,11 @@
+{
+  "name": "market-watch",
+  "version": "0.1.0",
+  "description": "Stock ticker in the status line, /quote pane, price alerts, a market-context band, and a quote tool the model can call.",
+  "author": { "name": "Rajib Bahar", "url": "https://github.com/rajib2k5" },
+  "homepage": "https://github.com/rajib2k5/claude-market-watch",
+  "repository": "https://github.com/rajib2k5/claude-market-watch",
+  "license": "MIT",
+  "keywords": ["stocks", "market-data", "ticker", "status-line", "alerts", "finance", "function-hooks"],
+  "types": "./types/index.d.ts"
+}

@@ -1,0 +1,4 @@
+# Written by Claude Code on every load; regenerated per build, never committed.
+.claude-plugin/types/
+node_modules/
+.DS_Store

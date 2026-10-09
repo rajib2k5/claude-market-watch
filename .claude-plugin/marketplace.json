@@ -1,0 +1,17 @@
+{
+  "name": "claude-market-watch",
+  "owner": {
+    "name": "Rajib Bahar",
+    "url": "https://github.com/rajib2k5"
+  },
+  "metadata": {
+    "description": "market-watch: a Claude Code mod (function hooks) for live stock quotes, alerts and a model-callable quote tool."
+  },
+  "plugins": [
+    {
+      "name": "market-watch",
+      "source": "./",
+      "description": "Stock ticker in the status line, /quote pane, price alerts, a market-context band, and a quote tool the model can call."
+    }
+  ]
+}
