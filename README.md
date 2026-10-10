@@ -35,27 +35,20 @@ An alert fires **once** when the price crosses its level, then disarms. It re-ar
 
 ## Requirements
 
-- **Claude Code 2.1.287 or later**. Tested on 2.1.287 (CLI) and 2.1.293 (desktop app).
-- **Function hooks enabled.** Mods are early access. Add this to `~/.claude/settings.json` and restart Claude Code:
+| | Minimum | Tested on |
+|---|---|---|
+| Claude Code in a terminal | v2.1.287 | 2.1.287 |
+| Claude Code in the Desktop app (Code tab) | v2.1.286 | 2.1.293 |
+| Network | HTTPS to `query1.finance.yahoo.com` | |
+| `git` | Needed to add the marketplace from GitHub | |
 
-  ```json
-  { "env": { "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1" } }
-  ```
+Mods are on by default from those versions. No API key, no account, no environment variable.
 
-  Or set it for one session: `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude`.
-- Network access to `query1.finance.yahoo.com`. No API key, no account.
+> If you set `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS` during the mods early access, remove it. Claude Code v2.1.287 and later ignores it ([mods overview](https://code.claude.com/docs/en/plugins/mods/overview#turn-mods-on-or-off)).
 
-## Install
+Where the mod works: the terminal and the Desktop app's Code tab draw everything. In the VS Code extension's chat panel and in `claude -p`, the commands and the `quote` tool work, but nothing is drawn (no status line, pane or band).
 
-At the prompt of a terminal session:
-
-```text
-/plugin install market-watch --marketplace rajib2k5/claude-market-watch
-```
-
-Answer `y` to add the marketplace, then pick a scope (user scope loads it in every session).
-
-Or from a shell:
+## Quick start
 
 ```bash
 claude plugin marketplace add rajib2k5/claude-market-watch
@@ -65,17 +58,13 @@ claude plugin marketplace add rajib2k5/claude-market-watch
 claude plugin install market-watch@claude-market-watch
 ```
 
-To try it without installing, clone the repo and load the folder for one session:
+Start `claude` (or run `/reload-plugins` in an open session), then run `/watch`. You should see:
 
-```bash
-git clone https://github.com/rajib2k5/claude-market-watch.git
+```text
+Watching: SPY, META, AAPL, AMZN, NFLX, GOOGL
 ```
 
-```bash
-claude --plugin-dir ./claude-market-watch
-```
-
-Then run `/watch` to see the watchlist, or `/quote AAPL`.
+The [Deployment guide](#deployment-guide) covers team rollout, pinning, updates, releases, rollback and removal.
 
 ## What it hooks, and what it can reach
 
@@ -98,6 +87,222 @@ Quotes come from Yahoo Finance's **unofficial, undocumented** chart endpoint (`/
 - Every `quote` tool result includes the source, the fetch time, each symbol's as-of time, and a "market closed" flag, so Claude does not present an old price as live.
 
 If the endpoint fails, the band shows the error (for example `⚠ AAPL: timed out after 8s`) and the ticker keeps the last good values.
+
+## Deployment guide
+
+**Tested** against this repository on Claude Code 2.1.287, in an isolated `CLAUDE_CONFIG_DIR`, with the output quoted as it appeared: marketplace add, install, `plugin list`, `claude -p "/watch"`, `plugin update`, `plugin uninstall`, `marketplace remove`, and `plugin tag --dry-run`.
+
+**From Anthropic's docs, not yet run here:** project-scope and managed-settings rollout, container seeds, and the `/plugin` toggles. Links point to the source pages.
+
+### 1. Install for yourself
+
+**From a shell:**
+
+```bash
+claude plugin marketplace add rajib2k5/claude-market-watch
+```
+
+```bash
+claude plugin install market-watch@claude-market-watch
+```
+
+Expected output:
+
+```text
+✔ Successfully added marketplace: claude-market-watch (declared in user settings)
+✔ Successfully installed plugin: market-watch@claude-market-watch (scope: user)
+```
+
+**Or inside a session:**
+
+```text
+/plugin install market-watch --marketplace rajib2k5/claude-market-watch
+```
+
+Answer `y` to add the marketplace, then pick a scope.
+
+The install id is always `market-watch@claude-market-watch`: the plugin name, `@`, the marketplace name from `.claude-plugin/marketplace.json` (not the repository name).
+
+**Scopes** (`--scope`, default `user`):
+
+| Scope | Loads in | Written to |
+|---|---|---|
+| `user` | Every session on your machine | `~/.claude/settings.json` |
+| `project` | This repository, for everyone who trusts it | `.claude/settings.json` (commit it) |
+| `local` | This repository, only for you | `.claude/settings.local.json` |
+
+**No GitHub SSH key?** `claude plugin marketplace add` tries SSH first, then HTTPS. To skip the SSH probe, set `CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1`.
+
+### 2. Check that it is running
+
+```bash
+claude plugin list
+```
+
+```text
+  ❯ market-watch@claude-market-watch
+    Version: 0.1.0
+    Scope: user
+    Status: ✔ enabled
+```
+
+In a session:
+
+- `/plugin` shows a dim line such as `1 mod active · market-watch`.
+- `/watch` answers `Watching: SPY, META, AAPL, AMZN, NFLX, GOOGL`.
+- The status line fills with prices within a few seconds of the session starting.
+
+Headless check, with no model call and no cost (the mod answers `/watch` itself):
+
+```bash
+claude -p "/watch"
+```
+
+```text
+market-watch: Watching: SPY, META, AAPL, AMZN, NFLX, GOOGL
+```
+
+`claude plugin details market-watch` reports `Hooks (0)`. That count is for settings hooks only; a mod's function hooks are listed by `claude plugin validate` instead.
+
+### 3. Roll out to a team
+
+**One repository.** In that repository, run once:
+
+```bash
+claude plugin marketplace add rajib2k5/claude-market-watch --scope project
+```
+
+```bash
+claude plugin install market-watch@claude-market-watch --scope project
+```
+
+Commit the `.claude/settings.json` these write. Each contributor gets the mod after they accept the workspace trust dialog for the folder.
+
+**A whole organization** (administrators). Put this in managed settings (server-managed settings, MDM, or `managed-settings.json`):
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "claude-market-watch": {
+      "source": { "source": "github", "repo": "rajib2k5/claude-market-watch" },
+      "autoUpdate": true
+    }
+  },
+  "enabledPlugins": {
+    "market-watch@claude-market-watch": true
+  }
+}
+```
+
+The marketplace key must equal the marketplace `name`, `claude-market-watch`. Managed `enabledPlugins` force-enables the mod; users cannot disable it at their own scope. See [Manage plugins for your organization](https://code.claude.com/docs/en/plugins/org). Review the mod first: `claude plugin validate` lists every hook and call ([What it hooks](#what-it-hooks-and-what-it-can-reach)).
+
+**Containers and CI** that cannot clone at run time: build a seed with `CLAUDE_CODE_PLUGIN_CACHE_DIR=/opt/claude-seed claude plugin marketplace add …` and `… plugin install …`, then set `CLAUDE_CODE_PLUGIN_SEED_DIR=/opt/claude-seed` and `enabledPlugins` at run time. The mod draws nothing under `claude -p`, but the `quote` tool works there.
+
+### 4. Pin a version
+
+Each release is a git tag named `market-watch--v<version>`, created by step 6. The first is `market-watch--v0.1.0`. To hold a machine on one release, add the marketplace at that tag:
+
+```bash
+claude plugin marketplace add rajib2k5/claude-market-watch#market-watch--v0.1.0
+```
+
+To move to a newer release, remove the marketplace and add it again at the new tag.
+
+### 5. Get updates
+
+Claude Code gives you a new copy only when the `version` in `.claude-plugin/plugin.json` changes. Pushing commits without a version bump does nothing for installed users.
+
+```bash
+claude plugin update market-watch@claude-market-watch
+```
+
+```text
+✔ market-watch is already at the latest version (0.1.0).
+```
+
+In a session, `/plugin marketplace update claude-market-watch` refreshes the catalog. To have updates arrive in the background, open `/plugin` → **Marketplaces** → `claude-market-watch` → **Enable auto-update** (it is off by default). After an update from the shell, run `/reload-plugins` in any open session.
+
+### 6. Release a new version (maintainer)
+
+1. **Gate.** All of these must pass:
+
+   ```bash
+   claude plugin test .
+   ```
+
+   ```bash
+   claude plugin validate .
+   ```
+
+   ```bash
+   claude plugin validate .claude-plugin/plugin.json
+   ```
+
+   ```bash
+   npx -p typescript@5.6.3 tsc -p .
+   ```
+
+2. **Bump** `version` in `.claude-plugin/plugin.json` (semver: patch for fixes, minor for features, major for a breaking change to commands, the tool's input, or stored data). Set it in `plugin.json` only, never also in `marketplace.json`.
+3. **Record** the change in `CHANGELOG.md`.
+4. **Commit and push** to `main`.
+5. **Tag** the release. Check first with `--dry-run`:
+
+   ```bash
+   claude plugin tag . --dry-run
+   ```
+
+   ```text
+   ✔ Dry run — would create tag market-watch--v0.1.0 at HEAD
+   ```
+
+   Then create and push it:
+
+   ```bash
+   claude plugin tag . --push
+   ```
+
+6. **Smoke test the published copy** in a throwaway config, so your own settings are untouched:
+
+   ```bash
+   export CLAUDE_CONFIG_DIR="$(mktemp -d)"
+   claude plugin marketplace add rajib2k5/claude-market-watch
+   claude plugin install market-watch@claude-market-watch
+   claude -p "/watch"
+   unset CLAUDE_CONFIG_DIR
+   ```
+
+   The last command must print `market-watch: Watching: …`.
+
+### 7. Roll back a bad release
+
+Roll **forward**. Revert the bad commit, bump to a new patch version (for example `0.2.0` → `0.2.1`), and release it as in step 6. Users then get the fix through a normal update. Avoid reusing an old version string: Claude Code compares versions to decide whether to update, and a reused string confuses anyone who already pinned it.
+
+A user who needs the old release immediately can pin to its tag, as in step 4.
+
+Stored data (watchlist and alerts) is plain JSON. A release that changes its shape must read the old shape too. `loadWatchlist` and `loadAlerts` in `hooks/register.tsx` already fall back to defaults when the stored value is not what they expect.
+
+### 8. Turn it off or remove it
+
+| Goal | Do this |
+|---|---|
+| Hide just the band | `/market`, or the band's **Hide** button |
+| Stop the mod, keep it installed | `/plugin` → **Installed** → disable `market-watch` |
+| Run one session without any mods | `claude --safe-mode` |
+| Uninstall | `claude plugin uninstall market-watch@claude-market-watch` (add `--keep-data` to keep the plugin's data directory for a later reinstall) |
+| Remove the marketplace too | `claude plugin marketplace remove claude-market-watch` (this also uninstalls its plugins) |
+
+### 9. Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| `/watch` is not a command | The mod did not load. Check `claude --version` (2.1.287+ in a terminal), run `/reload-plugins`, and check `/plugin` for the `mods active` line or an error. `claude --debug` logs why a hook was skipped. |
+| `Plugin "market-watch" not found in marketplace` | You installed by the wrong id. Use `market-watch@claude-market-watch`. |
+| Marketplace add fails on a git error | No SSH key for GitHub. Set `CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1` and retry. |
+| Status line shows `SPY …` and never fills | The first poll failed. The band shows the error after `⚠`. Check that `https://query1.finance.yahoo.com` is reachable from your machine. |
+| Band says `Market closed`, prices do not move | Expected outside US regular hours. The mod then polls every 15 minutes. |
+| An alert never fires | The symbol is not on the watchlist (`/watch add SYM`), or it already fired and is waiting to re-arm (`/alert` shows `fired, waiting to re-arm`). |
+| A new release does not arrive | The maintainer did not bump `version`, or auto-update is off. Run `claude plugin update market-watch@claude-market-watch`. |
+| `tsc` reports `TS2589` | You are type-checking with the generated `claude-code-mcp` types. Use this repository's `tsconfig.json`, which leaves them out. |
 
 ## How it works
 
@@ -142,9 +347,10 @@ npx -p typescript@5.6.3 tsc -p .
 - Alerts are checked only on a poll, so with a 60 s poll a brief spike between polls can be missed.
 - The pane opens from `/quote` at any width. The band and status line need no width.
 
-## Changelog
+## Changelog and product notes
 
-See [CHANGELOG.md](CHANGELOG.md).
+- [CHANGELOG.md](CHANGELOG.md): what changed in each release.
+- [PRFAQ.md](PRFAQ.md): why this exists, alternatives considered, risks, and what is next.
 
 ## License
 

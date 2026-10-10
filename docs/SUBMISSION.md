@@ -32,7 +32,7 @@ Puts the stock market inside your Claude Code session.
 
 **What it can reach:** `GET https://query1.finance.yahoo.com/v8/finance/chart/<SYMBOL>` (validated, URL-encoded symbol; no credentials) and its own `$.store` (watchlist, alerts). No files, no shell, no other tools, no prompts.
 
-Needs Claude Code 2.1.287+ and `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`. Data: Yahoo Finance's unofficial chart endpoint, may be delayed. Not investment advice.
+Needs Claude Code 2.1.287+ in a terminal or 2.1.286+ in the Desktop app; no environment variable. Data: Yahoo Finance's unofficial chart endpoint, may be delayed. Not investment advice.
 ```
 
 **Anything for the reviewer?**
