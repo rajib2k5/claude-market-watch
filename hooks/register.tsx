@@ -24,20 +24,20 @@ const OPEN_POLL_MS = 60_000
 const CLOSED_POLL_MS = 15 * 60_000
 const FETCH_TIMEOUT_MS = 8_000
 
-type $ = EngineInterface
+type Engine = EngineInterface
 
-async function loadWatchlist($: $): Promise<string[]> {
+async function loadWatchlist($: Engine): Promise<string[]> {
   const stored = await $.store.get(STORE_WATCHLIST)
   return Array.isArray(stored) ? stored.filter((s): s is string => typeof s === 'string') : [...DEFAULT_WATCHLIST]
 }
 
-async function loadAlerts($: $): Promise<AlertRule[]> {
+async function loadAlerts($: Engine): Promise<AlertRule[]> {
   const stored = await $.store.get(STORE_ALERTS)
   return Array.isArray(stored) ? (stored as AlertRule[]) : []
 }
 
 /** One chart fetch with a timeout; never rejects, so one bad symbol cannot sink a poll. */
-async function fetchChart($: $, symbol: string, range: Range = '1d'): Promise<ParsedChart> {
+async function fetchChart($: Engine, symbol: string, range: Range = '1d'): Promise<ParsedChart> {
   let timer: { cancel: () => void } | undefined
   const timeout = new Promise<ParsedChart>(resolve => {
     timer = $.clock.after(FETCH_TIMEOUT_MS, () =>
@@ -58,7 +58,7 @@ async function fetchChart($: $, symbol: string, range: Range = '1d'): Promise<Pa
 let lastPollMs = 0
 let isPolling = false
 
-async function poll($: $, isForced = false): Promise<void> {
+async function poll($: Engine, isForced = false): Promise<void> {
   if (isPolling) return
   const now = await $.clock.now()
   const held = await read($, quotes)
@@ -88,19 +88,27 @@ async function poll($: $, isForced = false): Promise<void> {
   }
 }
 
-async function checkAlerts($: $, fresh: Readonly<Record<string, Quote>>): Promise<void> {
+async function checkAlerts($: Engine, fresh: Readonly<Record<string, Quote>>): Promise<void> {
   const rules = await loadAlerts($)
   if (rules.length === 0) return
-  let isChanged = false
-  const next = rules.map(rule => {
+  const armedById = new Map<string, boolean>()
+  const fires: string[] = []
+  for (const rule of rules) {
     const q = fresh[rule.symbol]
-    if (!q) return rule
+    if (!q) continue
     const { isFired, isArmed } = evaluateAlert(rule, q.price)
-    if (isFired) $.ui.toast(`🔔 ${rule.symbol} ${rule.op} ${rule.level}: now ${formatPrice(q.price)}`, { timeoutMs: 15_000 })
-    if (isArmed !== rule.isArmed) isChanged = true
-    return isArmed === rule.isArmed ? rule : { ...rule, isArmed }
-  })
-  if (isChanged) await $.store.set(STORE_ALERTS, next)
+    if (isFired) fires.push(`🔔 ${rule.symbol} ${rule.op} ${rule.level}: now ${formatPrice(q.price)}`)
+    if (isArmed !== rule.isArmed) armedById.set(rule.id, isArmed)
+  }
+  if (armedById.size > 0) {
+    // $.store is shared by every session on the machine and get/set is not atomic. Re-read
+    // just before writing and apply only this poll's arm changes, by id, so an alert another
+    // session added or removed meanwhile is neither dropped nor resurrected. This narrows
+    // the race to the two awaits below; it cannot remove it.
+    const latest = await loadAlerts($)
+    await $.store.set(STORE_ALERTS, latest.map(r => (armedById.has(r.id) ? { ...r, isArmed: armedById.get(r.id)! } : r)))
+  }
+  for (const text of fires) $.ui.toast(text, { timeoutMs: 15_000 })
 }
 
 

@@ -2,6 +2,18 @@
 
 All notable changes to this mod. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] - 2026-10-10
+
+### Fixed
+- Alerts are no longer lost or resurrected when two Claude Code sessions update them at the same time. The poller now re-reads the alert list just before writing and applies only its own arm/disarm changes, by id. `$.store` has no atomic update, so a narrow window remains; see `PRFAQ.md`.
+
+### Changed
+- Renamed the internal TypeScript type alias `$` to `Engine` so Anthropic's plugin-directory checker can follow the hooks module. Type-only: the compiled JavaScript is byte-identical (validated, EGV C01).
+- Docs corrected where validation refuted the wording: as-of times are on every price line (not error lines), polling also happens at session start and after `/watch` edits, `isDeferred: false` needs Claude Code 2.1.293+, and the measured tool definition size is 584 characters.
+
+### Added
+- Evidence-gated validation report in `docs/validation/egv-2026-10-10/` (27 claims, two independent channels).
+
 ## [0.1.0] - 2026-10-09
 
 ### Added

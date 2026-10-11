@@ -31,6 +31,8 @@ An alert fires **once** when the price crosses its level, then disarms. It re-ar
 - One request per symbol (the watchlist plus `^VIX` and `^TNX`), made one after another.
 - Every **60 s** while the exchange's regular session is open, plus 5 minutes after the close to catch the closing print.
 - Every **15 min** while the market is closed, only to learn the next session's window.
+- Also once at each session start (and after a reload), and right after a `/watch` edit, whatever the time.
+- Each open Claude Code session runs its own poller. Two sessions mean twice the requests, and an alert toasts in each session that sees it fire.
 - The open/closed decision uses the session window Yahoo returns with each quote, so there is no timezone, DST or holiday calendar code to get wrong.
 
 ## Requirements
@@ -84,7 +86,7 @@ Quotes come from Yahoo Finance's **unofficial, undocumented** chart endpoint (`/
 
 - It can change or start refusing requests without notice. The batch quote endpoint (`/v7/finance/quote`) already returns `401`, which is why this mod makes one request per symbol.
 - Prices may be delayed, and Yahoo's terms govern use of the data. This mod is for personal, informational use.
-- Every `quote` tool result includes the source, the fetch time, each symbol's as-of time, and a "market closed" flag, so Claude does not present an old price as live.
+- Every `quote` tool result starts with the source and the fetch time. Every price line carries that symbol's as-of time, and a "market closed" flag after the close, so Claude does not present an old price as live. A symbol that fails gets an `ERROR` line with no price.
 
 If the endpoint fails, the band shows the error (for example `⚠ AAPL: timed out after 8s`) and the ticker keeps the last good values.
 

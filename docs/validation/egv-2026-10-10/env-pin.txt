@@ -1,0 +1,22 @@
+# env-pin — market-watch EGV, frozen 2026-10-11T03:09:03Z
+os: macOS 27.0.1 (arm64)
+claude CLI (terminal): 2.1.287 (Claude Code)
+claude engine that wrote mod types (Desktop app session): // Written by Claude Code 2.1.293.
+node: v25.5.0
+typescript used for type-check/transpile: 5.6.3 (npx -p typescript@5.6.3)
+python3: Python 3.11.14
+git HEAD: aee6af549751d1e79bc776c2cea7b826d7d9fa35 (tag market-watch--v0.1.0 -> aee6af549751d1e79bc776c2cea7b826d7d9fa35)
+working tree diff vs HEAD:
+   hooks/register.tsx | 12 ++++++------
+   1 file changed, 6 insertions(+), 6 deletions(-)
+sha256 of code under test (working tree):
+  50d3a22894504415b687a360adfc50de729a7cdb2479ef16a681dcfe802ba169  hooks/core.test.ts
+  21feceb0bef92a2565da5250d06b598ecef6f4b4858c0d598831cd5f1bfd5cca  hooks/core.ts
+  9874eb13d308a4979ec940c64ac1f7e86a72623899d8a53dc0079de8a9dd918a  hooks/register.test.ts
+  e0a3a4b1c9d483f3806c3f82f4d46f2661313111e6846e5398bf2948b2bd1df4  hooks/register.tsx
+  31e2a1c7a6b2e94b5008dd969cd409704103dcfb358c9ad4f9778e4d578bc39b  types/index.d.ts
+  9e95be13fa88b9698ab03772424076be6fceec2c765df8cefef13c9734d26423  .claude-plugin/plugin.json
+  8f244aefaadba0fde43601f2e7c43189ea936ada3ca7644ef9001ae71ca22353  .claude-plugin/marketplace.json
+  e7f1f79d57b91f3cd66a0ee8a329971297cea392899c85209e2fa428e15fe5cc  tsconfig.json
+mod API declarations (primary source for API claims): /private/tmp/claude-502/bundled-skills/2.1.293/ab5f87173ccd49822681ff8dee2701e3/plugin-authoring/types/claude-code.d.ts
+data endpoint: https://query1.finance.yahoo.com/v8/finance/chart/<SYMBOL> (unofficial, keyless)

@@ -26,7 +26,7 @@ Puts the stock market inside your Claude Code session.
 - **`/quote SYM`** opens a pane with price, day change, an intraday sparkline, day range and volume.
 - **`/alert TSLA > 260`** price alerts: fire once on the crossing, re-arm after a 0.5% retreat.
 - **Market band** above the prompt: open/closed, VIX, 10-year yield, data age.
-- **`quote` tool** Claude can call, so it uses current prices instead of training data. Every result carries the source and an as-of time.
+- **`quote` tool** Claude can call, so it uses current prices instead of training data. Every price line carries its as-of time and the source.
 
 **What it hooks:** `session.start`; `command.run` for its own four commands; `tool.call` for its own `mcp__market-watch__quote` only; `ui.render` for its own pane and the above-prompt band.
 
