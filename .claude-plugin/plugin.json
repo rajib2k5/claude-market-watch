@@ -8,6 +8,10 @@
   },
   "homepage": "https://github.com/rajib2k5/claude-market-watch",
   "repository": "https://github.com/rajib2k5/claude-market-watch",
+  "documentationUrl": "https://github.com/rajib2k5/claude-market-watch#readme",
+  "privacyPolicyUrl": "https://github.com/rajib2k5/claude-market-watch/blob/main/PRIVACY.md",
+  "supportUrl": "https://github.com/rajib2k5/claude-market-watch/issues",
+  "termsOfServiceUrl": "https://github.com/rajib2k5/claude-market-watch/blob/main/LICENSE",
   "license": "MIT",
   "keywords": [
     "stocks",
