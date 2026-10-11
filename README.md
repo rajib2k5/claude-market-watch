@@ -4,10 +4,9 @@ A [Claude Code](https://code.claude.com) mod that puts the stock market inside y
 
 Built on **function hooks**: a hooks module (`hooks/register.tsx`) that exports `register`. It is not a shell-hook plugin, a skill, or an MCP server.
 
-```text
-status line   SPY 778.57 ▲0.60% · META 718.67 ▼0.31% · AAPL 336.64 ▼1.11% · AMZN 262.43 ▲3.29% · NFLX 70.30 ▼1.77% · GOOGL 351.66 ▲0.97%
-band          Market closed · VIX 14.84 ▼3.70% · 10Y 5.24% · last trade 12m ago   [ Hide ]
-```
+![market-watch in Claude Code: /watch, the /quote AAPL pane with an intraday sparkline, the market band, and the ticker in the status line](docs/images/watch-and-quote-pane.png)
+
+*Real capture from Claude Code 2.1.287 in a terminal, 2026-10-10 (market closed, so prices are Friday's close).*
 
 > Not investment advice. Prices come from Yahoo Finance's unofficial chart endpoint and may be delayed. See [Data source](#data-source).
 
@@ -21,6 +20,22 @@ band          Market closed · VIX 14.84 ▼3.70% · 10Y 5.24% · last trade 12m
 | **Price alerts** | Toast | `/alert TSLA > 260`, `/alert SPY < 550`, `/alert` (list), `/alert rm a1`, `/alert clear`. |
 | **Market band** | Row above the prompt | Market open/closed, VIX, 10-year yield, data age, last poll error. `/market` or the Hide button toggles it. |
 | **`quote` tool** | Claude calls it | Ask *"how did the FAANG stocks do this month?"* and Claude calls `mcp__market-watch__quote` with up to 8 symbols and a range (`1d` `5d` `1mo` `3mo` `6mo` `ytd` `1y`). |
+
+## How to use it
+
+**1. The ticker and the band appear on their own** when a session starts: the watchlist in the status line under the prompt, and VIX plus the 10-year yield in the band above it.
+
+![Market band above the prompt and the ticker in the status line](docs/images/ticker-and-band.png)
+
+**2. Edit the watchlist and open a quote.** `/watch` shows or edits the list; `/quote SYM` replies with the price and opens a pane with the day's sparkline, range, volume and as-of time.
+
+![/watch and /quote AAPL with its pane](docs/images/watch-and-quote-pane.png)
+
+**3. Ask Claude about prices.** Claude calls the mod's `quote` tool (`market-watch - quote (MCP)`) and answers from live data. Each price line it receives carries the source and an as-of time.
+
+![Claude calling the quote tool and answering with a table of 1-month returns](docs/images/quote-tool-answer.png)
+
+**4. Set an alert.** `/alert TSLA > 260` toasts once when TSLA crosses 260, then waits until the price falls back 0.5% before it can fire again. `/alert` lists alerts; `/alert rm a1` and `/alert clear` remove them.
 
 ### Alert behaviour
 
@@ -79,6 +94,18 @@ Reviewers and cautious users: this is the complete surface, as reported by `clau
 | **Network** | `GET https://query1.finance.yahoo.com/v8/finance/chart/<SYMBOL>` only. Symbols are validated against `^\^?[A-Z0-9][A-Z0-9.\-=]{0,14}$` and URL-encoded. No credentials are sent. |
 | **Stored on disk** | Your watchlist and alerts, in the plugin's own `$.store`. Nothing else. |
 | **Does not touch** | Your files (`$.fs`), shell (`$.process`), other tools' calls, your prompts, the system prompt, or the transcript. It hooks no other tool and cannot block anything. |
+
+## For reviewers: data, privacy and permissions
+
+Plain answers to what Anthropic's plugin-directory checks ask a mod to state. The full policy is in [PRIVACY.md](PRIVACY.md).
+
+- **What it fetches.** Only `https://query1.finance.yahoo.com/v8/finance/chart/<SYMBOL>?range=…&interval=…`, built in `hooks/core.ts` (`chartUrl`). The `${…}` in that file are JavaScript template placeholders for the symbol and range, not environment variables.
+- **What it sends, and where.** Only the symbol, range, interval and a `User-Agent` header, to that one host. No credentials, no environment values, no file contents, no prompts or conversation text. It reads no credential from your machine.
+- **What it runs.** No processes and no shell. It never calls another tool, an agent or an MCP server.
+- **What it reads.** Its own stored watchlist and alerts, Yahoo's responses, and the arguments of its own commands and tool. It does not read the conversation, prompts, files or other plugins' data.
+- **Which hooks answer events, and why.** The `command.run` hooks answer only the four commands the mod registers (`watch`, `quote`, `alert`, `market`); they return the command's text and never touch other commands. The `tool.call` hook answers only `mcp__market-watch__quote`, the tool the mod itself registers. That is how a mod implements its own tool, and it does not stand in for any other tool. The mod hooks no permission event and never approves or denies anything.
+- **`types` in `plugin.json`.** Names the `$.state` contract (`types/index.d.ts`) that `claude plugin validate` checks the module against. Claude Code ignores it at load time.
+- **Mentions of other hosts in the docs.** `docs/SUBMISSION.md` names `claudemods.ai` as text in a submission checklist. No code contacts it.
 
 ## Data source
 

@@ -12,6 +12,7 @@ All notable changes to this mod. Versions follow [Semantic Versioning](https://s
 - Docs corrected where validation refuted the wording: as-of times are on every price line (not error lines), polling also happens at session start and after `/watch` edits, `isDeferred: false` needs Claude Code 2.1.293+, and the measured tool definition size is 584 characters.
 
 ### Added
+- `PRIVACY.md`, a plugin icon (`.claude-plugin/icon.png`), screenshots and a how-to section in the README, and a README section for plugin-directory reviewers.
 - Evidence-gated validation report in `docs/validation/egv-2026-10-10/` (27 claims, two independent channels).
 
 ## [0.1.0] - 2026-10-09
