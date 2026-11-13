@@ -11,7 +11,8 @@
     {
       "name": "market-watch",
       "source": "./",
-      "description": "Stock ticker in the status line, /quote pane, price alerts, a market-context band, and a quote tool the model can call."
+      "description": "Stock ticker in the status line, /quote pane, price alerts, a market-context band, and a quote tool the model can call.",
+      "version": "0.1.2"
     }
   ]
 }

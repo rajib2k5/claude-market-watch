@@ -65,6 +65,17 @@ Mods are on by default from those versions. No API key, no account, no environme
 
 Where the mod works: the terminal and the Desktop app's Code tab draw everything. In the VS Code extension's chat panel and in `claude -p`, the commands and the `quote` tool work, but nothing is drawn (no status line, pane or band).
 
+## Install
+
+market-watch is **not listed in the Anthropic plugin directory**. You install it from this repository's own marketplace (`.claude-plugin/marketplace.json`, marketplace name `claude-market-watch`):
+
+```text
+/plugin marketplace add rajib2k5/claude-market-watch
+/plugin install market-watch@claude-market-watch
+```
+
+The same two steps from a shell: `claude plugin marketplace add rajib2k5/claude-market-watch`, then `claude plugin install market-watch@claude-market-watch`. See [Quick start](#quick-start) and the [Deployment guide](#deployment-guide) for details.
+
 ## Quick start
 
 ```bash
