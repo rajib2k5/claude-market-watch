@@ -9,12 +9,17 @@ export const CONTEXT_SYMBOLS: readonly string[] = ['^VIX', '^TNX']
 export const MAX_WATCHLIST = 12
 export const MAX_TOOL_SYMBOLS = 8
 
-export const SOURCE = 'Yahoo Finance chart API (unofficial, keyless)'
+export const sourceName = 'Yahoo Finance chart API (unofficial, keyless)'
 
 export const RANGES = ['1d', '5d', '1mo', '3mo', '6mo', 'ytd', '1y'] as const
 export type Range = (typeof RANGES)[number]
-const INTERVAL_FOR: Record<Range, string> = {
+const intervals: Record<Range, string> = {
   '1d': '5m', '5d': '30m', '1mo': '1d', '3mo': '1d', '6mo': '1d', 'ytd': '1d', '1y': '1d',
+}
+
+/** The bar interval Yahoo is asked for, per range. */
+export function intervalFor(range: Range): string {
+  return intervals[range]
 }
 
 // Equities, ETFs, indices (^VIX), share classes (BRK.B, BRK-B), FX/futures (EURUSD=X, ES=F).
@@ -26,10 +31,6 @@ export function normalizeSymbol(raw: string): string | null {
   return SYMBOL_PATTERN.test(symbol) ? symbol : null
 }
 
-export function chartUrl(symbol: string, range: Range = '1d'): string {
-  const query = `range=${range}&interval=${INTERVAL_FOR[range]}`
-  return `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?${query}`
-}
 
 export type ParsedChart =
   | { isOk: true; quote: Quote; rangeBaseClose: number | null }
@@ -80,7 +81,7 @@ export function parseChart(symbol: string, status: number, body: string): Parsed
   return { isOk: true, quote, rangeBaseClose: num(meta.chartPreviousClose) }
 }
 
-const BLOCKS = '▁▂▃▄▅▆▇█'
+const BLOCKS = '\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588'
 
 /**
  * Min-max scaled sparkline, `width` glyphs wide. Min-max makes small moves
@@ -102,8 +103,8 @@ export function sparkline(values: readonly number[], width: number): string {
 }
 
 export function formatPct(pct: number | null): string {
-  if (pct === null) return '—'
-  const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '·'
+  if (pct === null) return '\u2014'
+  const arrow = pct > 0 ? '\u25B2' : pct < 0 ? '\u25BC' : '\u00B7'
   return `${arrow}${Math.abs(pct).toFixed(2)}%`
 }
 
@@ -111,14 +112,14 @@ export function formatPrice(price: number): string {
   return price >= 1000 ? price.toFixed(0) : price.toFixed(2)
 }
 
-/** The status-line text: `SPY 571.20 ▲0.80% · AAPL …`; missing symbols show `…`. */
+/** The status-line text: `SPY 571.20 (up-arrow)0.80% (dot) AAPL (ellipsis)`; a missing symbol shows an ellipsis. */
 export function formatTicker(list: readonly string[], quotes: Readonly<Record<string, Quote>>): string {
   return list
     .map(symbol => {
       const q = quotes[symbol]
-      return q ? `${symbol} ${formatPrice(q.price)} ${formatPct(q.dayChangePct)}` : `${symbol} …`
+      return q ? `${symbol} ${formatPrice(q.price)} ${formatPct(q.dayChangePct)}` : `${symbol} \u2026`
     })
-    .join(' · ')
+    .join(' \u00B7 ')
 }
 
 /** Grace after the close so the closing print is captured before going idle. */
@@ -141,14 +142,14 @@ export type WatchCommand =
   | { kind: 'add' | 'remove' | 'set'; symbols: string[]; rejected: string[] }
   | { kind: 'usage'; message: string }
 
-const WATCH_USAGE = 'Usage: /watch [add|remove|set] SYM… | /watch reset'
+const watchUsage = 'Usage: /watch [add|remove|set] SYM\u2026 | /watch reset'
 
 export function parseWatchArgs(args: string): WatchCommand {
   const [verb = '', ...rest] = args.trim().split(/[\s,]+/).filter(Boolean)
   const v = verb.toLowerCase()
   if (v === '') return { kind: 'show' }
   if (v === 'reset') return { kind: 'reset' }
-  if (v !== 'add' && v !== 'remove' && v !== 'set') return { kind: 'usage', message: WATCH_USAGE }
+  if (v !== 'add' && v !== 'remove' && v !== 'set') return { kind: 'usage', message: watchUsage }
   const symbols: string[] = []
   const rejected: string[] = []
   for (const raw of rest) {
@@ -156,7 +157,7 @@ export function parseWatchArgs(args: string): WatchCommand {
     if (s === null) rejected.push(raw)
     else if (!symbols.includes(s)) symbols.push(s)
   }
-  if (symbols.length === 0) return { kind: 'usage', message: `${WATCH_USAGE} (no valid symbols given)` }
+  if (symbols.length === 0) return { kind: 'usage', message: `${watchUsage} (no valid symbols given)` }
   return { kind: v, symbols, rejected }
 }
 
@@ -248,7 +249,7 @@ export function formatForModel(
         : `${range} return ${((quote.price / rangeBaseClose - 1) * 100).toFixed(2)}% (from ${rangeBaseClose})`,
     )
   }
-  if (quote.dayLow !== null && quote.dayHigh !== null) parts.push(`day range ${quote.dayLow}–${quote.dayHigh}`)
+  if (quote.dayLow !== null && quote.dayHigh !== null) parts.push(`day range ${quote.dayLow}\u2013${quote.dayHigh}`)
   if (quote.volume !== null) parts.push(`volume ${quote.volume}`)
   const isClosed = quote.session !== null && fetchedAtMs > quote.session.endMs + CLOSE_GRACE_MS
   parts.push(`as of ${iso(quote.asOfMs)}${isClosed ? ' (market closed; last regular-session price)' : ''}`)
@@ -256,5 +257,5 @@ export function formatForModel(
 }
 
 export function toolHeader(fetchedAtMs: number): string {
-  return `Source: ${SOURCE}. Fetched ${iso(fetchedAtMs)}. Prices may be delayed; not investment advice.`
+  return `Source: ${sourceName}. Fetched ${iso(fetchedAtMs)}. Prices may be delayed; not investment advice.`
 }

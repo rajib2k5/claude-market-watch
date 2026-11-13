@@ -21,11 +21,12 @@ const chart = (symbol: string, price: number, base: number) =>
   })
 
 /** The world beneath the plugin: clock, store, network and the UI calls it makes. */
-function world(on: On, fetched: string[]) {
+function world(on: On, fetched: string[], inits: unknown[] = []) {
   mock.clock(on, { now: 1791560000_000 })
   mock.store(on)
   on('http.fetch', (_$, e) => {
     fetched.push(e.url)
+    inits.push(e.init)
     const symbol = decodeURIComponent(new URL(e.url).pathname.split('/').pop() ?? '')
     if (symbol === 'ZZZZ') {
       return { value: { status: 404, ok: false, headers: {}, text: '{"chart":{"result":null,"error":{"code":"Not Found","description":"No data found"}}}' } }
@@ -68,4 +69,22 @@ test('quote tool refuses a call with no valid symbol', async ($, on) => {
   world(on, [])
   const ran = await $.tool.call({ tool: TOOL, symbols: ['!!'] })
   expect(ran.deny ?? ran.text).toContain('give 1-8 ticker symbols')
+})
+
+test('every request goes to the one Yahoo host with only a User-Agent header, whatever the tool input holds', async ($, on) => {
+  const fetched: string[] = []
+  const inits: unknown[] = []
+  world(on, fetched, inits)
+  // Fields the tool does not define must not reach the request.
+  await $.tool.call({ tool: TOOL, symbols: ['AAPL', 'BRK.B'], range: '5d', note: 'TRANSCRIPT-TEXT', apiKey: 'KEY-VALUE' })
+  expect(fetched.length).toBe(2)
+  for (const url of fetched) {
+    const u = new URL(url)
+    expect(`${u.protocol}//${u.host}${u.pathname.replace(/[^/]*$/, '')}`).toBe('https://query1.finance.yahoo.com/v8/finance/chart/')
+    expect(u.search).toBe('?range=5d&interval=30m')
+    expect(url).not.toContain('TRANSCRIPT-TEXT')
+    expect(url).not.toContain('KEY-VALUE')
+  }
+  expect(fetched[1]).toContain('/chart/BRK.B?')
+  for (const init of inits) expect(JSON.stringify(init)).toBe('{"headers":{"User-Agent":"Mozilla/5.0"}}')
 })

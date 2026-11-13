@@ -1,6 +1,6 @@
 {
   "name": "market-watch",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Stock ticker in the status line, /quote pane, price alerts, a market-context band, and a quote tool the model can call.",
   "author": {
     "name": "Rajib Bahar",
@@ -11,7 +11,6 @@
   "documentationUrl": "https://github.com/rajib2k5/claude-market-watch#readme",
   "privacyPolicyUrl": "https://github.com/rajib2k5/claude-market-watch/blob/main/PRIVACY.md",
   "supportUrl": "https://github.com/rajib2k5/claude-market-watch/issues",
-  "termsOfServiceUrl": "https://github.com/rajib2k5/claude-market-watch/blob/main/LICENSE",
   "license": "MIT",
   "keywords": [
     "stocks",

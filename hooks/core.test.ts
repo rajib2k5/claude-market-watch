@@ -94,13 +94,13 @@ describe('symbols and watchlist', () => {
 describe('display', () => {
   test('ticker shows arrows and a placeholder for a symbol not yet loaded', () => {
     const text = formatTicker(['SPY', 'AAPL'], { SPY: quote({ price: 571.2, dayChangePct: -0.2 }) })
-    expect(text).toBe('SPY 571.20 ▼0.20% · AAPL …')
+    expect(text).toBe('SPY 571.20 \u25BC0.20% \u00B7 AAPL \u2026')
   })
 
   test('sparkline is width-bounded, flat input is a flat line, empty is empty', () => {
-    expect(sparkline([1, 2, 3, 4, 5, 6, 7, 8], 8)).toBe('▁▂▃▄▅▆▇█')
+    expect(sparkline([1, 2, 3, 4, 5, 6, 7, 8], 8)).toBe('\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588')
     expect(sparkline([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 4).length).toBe(4)
-    expect(sparkline([5, 5, 5], 10)).toBe('▄▄▄')
+    expect(sparkline([5, 5, 5], 10)).toBe('\u2584\u2584\u2584')
     expect(sparkline([], 10)).toBe('')
   })
 

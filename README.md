@@ -89,9 +89,9 @@ Reviewers and cautious users: this is the complete surface, as reported by `clau
 
 | | |
 |---|---|
-| **Hooks** | `session.start` (registers commands, the tool and the poll timer) · `command.run` for `watch`, `quote`, `alert`, `market` only · `tool.call` for `mcp__market-watch__quote` only · `ui.render` for its own `Pane` (`market-quote`) and the `AbovePrompt` band |
+| **Hooks** | `session.start` (registers commands, the tool and the poll timer) · `command.run` (the slash-command event, not a process) for `watch`, `quote`, `alert`, `market` only · `tool.call` for `mcp__market-watch__quote` only · `ui.render` for its own `Pane` (`market-quote`) and the `AbovePrompt` band |
 | **Calls on `$`** | `http.fetch`, `clock.now/after/every`, `store.get/set`, `state.get/set`, `command.register`, `tool.register`, `ui.open/resolve/status/toast` |
-| **Network** | `GET https://query1.finance.yahoo.com/v8/finance/chart/<SYMBOL>` only. Symbols are validated against `^\^?[A-Z0-9][A-Z0-9.\-=]{0,14}$` and URL-encoded. No credentials are sent. |
+| **Network** | `GET https://query1.finance.yahoo.com/v8/finance/chart/<SYMBOL>` only. Symbols are validated against `^\^?[A-Z0-9][A-Z0-9.\-=]{0,14}$` and URL-encoded. Only the symbol, range and interval are sent. |
 | **Stored on disk** | Your watchlist and alerts, in the plugin's own `$.store`. Nothing else. |
 | **Does not touch** | Your files (`$.fs`), shell (`$.process`), other tools' calls, your prompts, the system prompt, or the transcript. It hooks no other tool and cannot block anything. |
 
@@ -99,13 +99,27 @@ Reviewers and cautious users: this is the complete surface, as reported by `clau
 
 Plain answers to what Anthropic's plugin-directory checks ask a mod to state. The full policy is in [PRIVACY.md](PRIVACY.md).
 
-- **What it fetches.** Only `https://query1.finance.yahoo.com/v8/finance/chart/<SYMBOL>?range=…&interval=…`, built in `hooks/core.ts` (`chartUrl`). The `${…}` in that file are JavaScript template placeholders for the symbol and range, not environment variables.
-- **What it sends, and where.** Only the symbol, range, interval and a `User-Agent` header, to that one host. No credentials, no environment values, no file contents, no prompts or conversation text. It reads no credential from your machine.
-- **What it runs.** No processes and no shell. It never calls another tool, an agent or an MCP server.
-- **What it reads.** Its own stored watchlist and alerts, Yahoo's responses, and the arguments of its own commands and tool. It does not read the conversation, prompts, files or other plugins' data.
-- **Which hooks answer events, and why.** The `command.run` hooks answer only the four commands the mod registers (`watch`, `quote`, `alert`, `market`); they return the command's text and never touch other commands. The `tool.call` hook answers only `mcp__market-watch__quote`, the tool the mod itself registers. That is how a mod implements its own tool, and it does not stand in for any other tool. The mod hooks no permission event and never approves or denies anything.
-- **`types` in `plugin.json`.** Names the `$.state` contract (`types/index.d.ts`) that `claude plugin validate` checks the module against. Claude Code ignores it at load time.
-- **Mentions of other hosts in the docs.** `docs/SUBMISSION.md` names `claudemods.ai` as text in a submission checklist. No code contacts it.
+### Network: what is fetched, from which host, and what is sent
+
+- **One host.** Every request is an HTTPS `GET` to `query1.finance.yahoo.com`, path `/v8/finance/chart/<SYMBOL>`, query `range=<range>&interval=<interval>`. The URL is written as one fixed `https://query1.finance.yahoo.com/v8/finance/chart/...` template at the single `$.http.fetch` call in `hooks/register.tsx` (`fetchChart`). Only three values are filled in: the symbol, after `normalizeSymbol` accepts it (`^\^?[A-Z0-9][A-Z0-9.\-=]{0,14}$`) and `encodeURIComponent` encodes it; the range, one of `1d 5d 1mo 3mo 6mo ytd 1y`; and that range's fixed bar interval.
+- **The request options** are an inline object literal at the same call: one header, `User-Agent: Mozilla/5.0`. No body, no `auth`, no cookies, no other header.
+- **What is sent.** Only the symbol, the range and the interval, in the URL. Where the symbols come from: the watchlist and the two context symbols (`^VIX`, `^TNX`) for the background poll, the `/quote` argument, or the `symbols` the model passes to the `quote` tool. The watchlist and alerts the mod keeps in `$.store` are read to choose which symbols to poll; the stored lists themselves, alert levels, prompts, conversation text, file contents and any other tool-call fields are never put in a request. A test (`hooks/register.test.ts`, "every request goes to the one Yahoo host...") passes extra fields in a tool call and checks that every request has this exact host, path prefix, query and header.
+- **When.** At session start, then every 60 s while the exchange is open and every 15 min while it is closed; after a `/watch` edit; on `/quote`; and when the model calls the `quote` tool.
+
+### Hooks: what each one does with what it sees
+
+- **`command.run` (for `watch`, `quote`, `alert`, `market` only).** `command.run` is the event the engine raises when someone types a slash command. It does not run a process or a shell command. Each hook is matched by a fixed command name, and that name is one the mod registers itself. It reads only the typed arguments, answers with the command's text, and never calls `next`, so no other command is seen or changed. `/watch` and `/alert` write the watchlist or alert list to the mod's own `$.store`. `/quote` fetches one symbol (see above) and opens the mod's pane. `/market` shows or hides the band.
+- **`tool.call` for `mcp__market-watch__quote` only: it answers for that tool.** The matcher is the fixed tool name `mcp__market-watch__quote`, the tool the mod registers itself with `$.tool.register` (the `mcp__` prefix is how the engine names plugin tools; there is no MCP server). The hook returns its own `{ result }` in place of a tool, because that is how a mod implements its own tool: there is no other implementation underneath to call. It reads only `symbols` (1-8, each validated) and `range`, fetches each symbol from the host above, and returns text that starts with the source and fetch time and gives each symbol's price, day change, optional period return and as-of time, or an `ERROR` line. With no valid symbol it returns `{ deny }` with a usage message. It never sees, answers or blocks any other tool.
+- **`session.start`.** Registers the four commands and the `quote` tool, starts the poll timer, and runs one poll. It then calls `next(e)` unchanged.
+- **`ui.render`.** Draws the mod's own pane (`market-quote`) and the band above the prompt from quotes the mod already holds. It reads nothing else.
+- The mod hooks no permission event, runs no process, reads no file, and calls no other tool, agent or MCP server.
+
+### Other notes
+
+- **Credentials.** The mod uses none. Yahoo's chart endpoint is keyless, so the manifest has no `userConfig` and no MCP server, and the code reads no environment value.
+- **`types` in `plugin.json`** is a documented manifest field. It names the `$.state` contract, `types/index.d.ts`, which `claude plugin validate` checks the module's state keys against; without it, older validators (2.1.296) fail with "is not declared" errors. Claude Code does not run it: it holds types only.
+- **Listing fields.** `documentationUrl`, `privacyPolicyUrl` and `supportUrl` are directory listing fields that Claude Code ignores at load time.
+- **Repository contents.** The shipped plugin is the manifest, `hooks/`, `types/` and the docs at the top level. The evidence-gated validation record and the directory submission kit were moved out of the shipped tree in 0.1.2; they remain in the git history at commit `765b8dc` (`docs/validation/`, `docs/SUBMISSION.md`).
 
 ## Data source
 

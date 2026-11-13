@@ -3,8 +3,8 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { AlertRule, Quote } from '../types'
 import {
-  CONTEXT_SYMBOLS, DEFAULT_WATCHLIST, MAX_TOOL_SYMBOLS, RANGES, applyWatch, chartUrl, evaluateAlert,
-  formatAlert, formatForModel, formatPct, formatPrice, formatTicker, isMarketOpen, normalizeSymbol,
+  CONTEXT_SYMBOLS, DEFAULT_WATCHLIST, MAX_TOOL_SYMBOLS, RANGES, applyWatch, evaluateAlert,
+  formatAlert, formatForModel, formatPct, formatPrice, formatTicker, intervalFor, isMarketOpen, normalizeSymbol,
   parseAlertArgs, parseChart, parseWatchArgs, sparkline, toolHeader,
 } from './core'
 import type { ParsedChart, Range } from './core'
@@ -14,8 +14,6 @@ const focus = atom({ plugin: 'market-watch', key: 'focus' } as const, null)
 const isBandHidden = atom({ plugin: 'market-watch', key: 'isBandHidden' } as const, false)
 const lastError = atom({ plugin: 'market-watch', key: 'lastError' } as const, null)
 
-const PANE = 'market-quote'
-const TOOL = 'mcp__market-watch__quote'
 const STORE_WATCHLIST = 'watchlist'
 const STORE_ALERTS = 'alerts'
 
@@ -36,7 +34,14 @@ async function loadAlerts($: Engine): Promise<AlertRule[]> {
   return Array.isArray(stored) ? (stored as AlertRule[]) : []
 }
 
-/** One chart fetch with a timeout; never rejects, so one bad symbol cannot sink a poll. */
+/**
+ * One chart fetch with a timeout; never rejects, so one bad symbol cannot sink a poll.
+ *
+ * This is the mod's only network call. The host and path are fixed text at the call
+ * site; only the symbol (validated by normalizeSymbol, then URL-encoded), the range
+ * (one of RANGES) and its interval vary. The options are fixed too: one User-Agent
+ * header, no body, no auth. Nothing from the store or the conversation is sent.
+ */
 async function fetchChart($: Engine, symbol: string, range: Range = '1d'): Promise<ParsedChart> {
   let timer: { cancel: () => void } | undefined
   const timeout = new Promise<ParsedChart>(resolve => {
@@ -44,7 +49,10 @@ async function fetchChart($: Engine, symbol: string, range: Range = '1d'): Promi
       resolve({ isOk: false, error: `${symbol}: timed out after ${FETCH_TIMEOUT_MS / 1000}s` }))
   })
   const request = $.http
-    .fetch(chartUrl(symbol, range), { headers: { 'User-Agent': 'Mozilla/5.0' } })
+    .fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${intervalFor(range)}`,
+      { headers: { 'User-Agent': 'Mozilla/5.0' } },
+    )
     .then(res => parseChart(symbol, res.status, res.text))
     .catch((err: unknown): ParsedChart => ({ isOk: false, error: `${symbol}: ${String(err)}` }))
   try {
@@ -97,7 +105,7 @@ async function checkAlerts($: Engine, fresh: Readonly<Record<string, Quote>>): P
     const q = fresh[rule.symbol]
     if (!q) continue
     const { isFired, isArmed } = evaluateAlert(rule, q.price)
-    if (isFired) fires.push(`🔔 ${rule.symbol} ${rule.op} ${rule.level}: now ${formatPrice(q.price)}`)
+    if (isFired) fires.push(`\u{1F514} ${rule.symbol} ${rule.op} ${rule.level}: now ${formatPrice(q.price)}`)
     if (isArmed !== rule.isArmed) armedById.set(rule.id, isArmed)
   }
   if (armedById.size > 0) {
@@ -114,7 +122,7 @@ async function checkAlerts($: Engine, fresh: Readonly<Record<string, Quote>>): P
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'watch', description: 'Show or edit the market-watch ticker symbols', argumentHint: '[add|remove|set SYM…] | reset' })
+    await $.command.register({ name: 'watch', description: 'Show or edit the market-watch ticker symbols', argumentHint: '[add|remove|set SYM\u2026] | reset' })
     await $.command.register({ name: 'quote', description: 'Open a quote pane for a symbol', argumentHint: 'SYM' })
     await $.command.register({ name: 'alert', description: 'Set, list or clear price alerts', argumentHint: 'SYM > 260 | rm <id> | clear' })
     await $.command.register({ name: 'market', description: 'Show or hide the market-context band above the prompt' })
@@ -159,7 +167,7 @@ export const register: Register = on => {
     if (!parsed.isOk) return { text: `Could not load ${symbol}: ${parsed.error}` }
     await update($, quotes, prev => ({ ...prev, [symbol]: parsed.quote }))
     await update($, focus, () => symbol)
-    await $.ui.open({ id: PANE, title: symbol })
+    await $.ui.open({ id: 'market-quote', title: symbol })
     return { text: `${symbol} ${formatPrice(parsed.quote.price)} ${formatPct(parsed.quote.dayChangePct)}` }
   })
 
@@ -196,7 +204,7 @@ export const register: Register = on => {
     return { text: isHidden ? 'Market band hidden.' : 'Market band shown.' }
   })
 
-  on('tool.call', { tool: TOOL }, async ($, e) => {
+  on('tool.call', { tool: 'mcp__market-watch__quote' }, async ($, e) => {
     const input = e as unknown as { symbols?: unknown; range?: unknown }
     const range: Range = RANGES.includes(input.range as Range) ? (input.range as Range) : '1d'
     const raw = Array.isArray(input.symbols) ? input.symbols.map(String) : []
@@ -210,7 +218,7 @@ export const register: Register = on => {
     return { result: [toolHeader(fetchedAtMs), ...lines].join('\n') }
   })
 
-  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+  on('ui.render', { component: 'Pane', requestId: 'market-quote' }, async ($, e) => {
     const { Box, Text } = $.ui.resolve(e)
     const symbol = await read($, focus)
     const q = symbol ? (await read($, quotes))[symbol] : undefined
@@ -220,14 +228,14 @@ export const register: Register = on => {
     const hi = q.closes.length ? Math.max(...q.closes) : null
     return (
       <Box flexDirection="column">
-        <Text bold>{q.symbol} · {q.name}</Text>
+        <Text bold>{q.symbol}{' \u00B7 '}{q.name}</Text>
         <Text>
           {formatPrice(q.price)} {q.currency} {formatPct(q.dayChangePct)}
         </Text>
         <Text>{sparkline(q.closes, width)}</Text>
-        {lo !== null && hi !== null && <Text dimColor>chart low {formatPrice(lo)} · high {formatPrice(hi)}</Text>}
+        {lo !== null && hi !== null && <Text dimColor>chart low {formatPrice(lo)}{' \u00B7 '}high {formatPrice(hi)}</Text>}
         {q.dayLow !== null && q.dayHigh !== null && (
-          <Text dimColor>day range {formatPrice(q.dayLow)}–{formatPrice(q.dayHigh)}</Text>
+          <Text dimColor>day range {formatPrice(q.dayLow)}{'\u2013'}{formatPrice(q.dayHigh)}</Text>
         )}
         {q.volume !== null && <Text dimColor>volume {q.volume.toLocaleString('en-US')}</Text>}
         <Text dimColor>as of {new Date(q.asOfMs).toISOString().slice(0, 16).replace('T', ' ')} UTC</Text>
@@ -251,10 +259,10 @@ export const register: Register = on => {
       <Box>
         <Text dimColor>
           {isMarketOpen(now, held) ? 'Market open' : 'Market closed'}
-          {vix ? ` · VIX ${vix.price.toFixed(2)} ${formatPct(vix.dayChangePct)}` : ''}
-          {tnx ? ` · 10Y ${tnx.price.toFixed(2)}%` : ''}
-          {newest ? ` · last trade ${Math.max(0, Math.round((now - newest) / 60_000))}m ago` : ''}
-          {error ? ` · ⚠ ${error.slice(0, 60)}` : ''}{' '}
+          {vix ? ` \u00B7 VIX ${vix.price.toFixed(2)} ${formatPct(vix.dayChangePct)}` : ''}
+          {tnx ? ` \u00B7 10Y ${tnx.price.toFixed(2)}%` : ''}
+          {newest ? ` \u00B7 last trade ${Math.max(0, Math.round((now - newest) / 60_000))}m ago` : ''}
+          {error ? ` \u00B7 \u26A0 ${error.slice(0, 60)}` : ''}{' '}
         </Text>
         <Button key="hide" label="Hide" onPress={() => update($, isBandHidden, () => true)} />
       </Box>

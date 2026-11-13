@@ -91,7 +91,7 @@ It stores your watchlist and alerts in the plugin's own storage on your machine.
 | Browser tab or OS widget | n/a | No | It doesn't solve the stale-price problem inside Claude. |
 
 **Q: Why Yahoo's unofficial endpoint, and not a keyed API (Finnhub, Polygon, Alpaca)?**
-Zero setup was a launch goal: two commands and nothing to sign up for. Yahoo's `/v8/finance/chart` endpoint answered keyless requests on 2026-10-09 (*measured*: HTTP 200). This is the largest risk in the product, covered below. The parser is isolated in `core.ts` (`chartUrl`, `parseChart`), so adding a keyed provider later is a contained change.
+Zero setup was a launch goal: two commands and nothing to sign up for. Yahoo's `/v8/finance/chart` endpoint answered keyless requests on 2026-10-09 (*measured*: HTTP 200). This is the largest risk in the product, covered below. The parser is isolated in `core.ts` (`parseChart`) and the request in one `fetchChart` call in `register.tsx`, so adding a keyed provider later is a contained change.
 
 **Q: What are the risks, and what happens when each one hits?**
 
@@ -101,12 +101,12 @@ Zero setup was a launch goal: two commands and nothing to sign up for. Yahoo's `
 | Rate limiting | Low at current volume: 8 requests a minute per open session while the market is open (*measured*: 6 watchlist + 2 context symbols); two open sessions double it | Some symbols show errors for a poll | Same | Requests are sequential, the watchlist is capped at 12, and polls drop to every 15 min when closed |
 | The mods API changes between Claude Code releases (it is early access) | Medium | The mod fails to load, or a hook is skipped | `claude plugin validate` and `claude plugin test` in the release gate; the transcript names a failed mod | Pin the minimum version in the README; re-run the gate on new Claude Code releases |
 | Yahoo data terms | Low for personal use | n/a | n/a | The README states personal, informational use and links the data caveats |
-| A stale price is read as live | Low | A wrong number in a decision | n/a | Every price line carries an as-of time and a market-closed flag (validated: EGV C20.1) |
+| A stale price is read as live | Low | A wrong number in a decision | n/a | Every price line carries an as-of time and a market-closed flag (validated: EGV C20.1, record in git history at `765b8dc`) |
 | Two sessions update the shared alert store at once | Medium for people with several sessions open | An alert could be dropped, resurrected or fire twice | n/a | Fixed in 0.1.1: the poller re-reads alerts just before writing and applies only its own changes by id (tests in `hooks/alerts-concurrency.test.ts`). `$.store` has no atomic update, so a narrow window remains. |
 | Supply chain: a future version adds a malicious change | Low | It would run with the user's permissions, like any mod | Reviewers diff `claude plugin validate` output between versions | Releases are tagged; users and admins can pin a tag |
 
 **Q: How is it tested?**
-22 automated tests (*measured*, `claude plugin test .`). The pure core covers parsing, symbol validation, watchlist edits, the sparkline, market-open logic, model-text formatting and the alert state machine. Integration tests run through the engine and cover `/watch` and the `quote` tool, with the network mocked. On 2026-10-09 the published copy was installed from GitHub in an isolated config, and `claude -p "/watch"` returned the default watchlist at $0 model cost (*measured*). Not yet tested automatically: the drawn pane and band, and real network calls (those were checked by hand with a live tool call).
+25 automated tests (*measured* 2026-11-13, `claude plugin test .`). The pure core covers parsing, symbol validation, watchlist edits, the sparkline, market-open logic, model-text formatting and the alert state machine. Integration tests run through the engine and cover `/watch` and the `quote` tool, with the network mocked. On 2026-10-09 the published copy was installed from GitHub in an isolated config, and `claude -p "/watch"` returned the default watchlist at $0 model cost (*measured*). Not yet tested automatically: the drawn pane and band, and real network calls (those were checked by hand with a live tool call).
 
 **Q: What does success look like?**
 These are *targets* to check at 90 days; nothing has been measured yet:

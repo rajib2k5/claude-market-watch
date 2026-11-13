@@ -2,6 +2,24 @@
 
 All notable changes to this mod. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.2] - 2026-11-13
+
+Changes for the Anthropic plugin directory's automatic policy check. No change to what the mod does.
+
+### Changed
+- The Yahoo request URL is now one fixed `https://query1.finance.yahoo.com/...` template at the single `$.http.fetch` call, with the options as an inline object. Removed `chartUrl` from `core.ts`; `intervalFor` gives the bar interval.
+- The `tool.call` and pane matchers use the literal tool name and pane id instead of constants.
+- Non-ASCII glyphs in code (arrows, dots, sparkline blocks, the bell) are written as `\u` escapes. Output is unchanged.
+- README: new reviewer sections on what is fetched, from which host and what is sent, and on what the `command.run` and `tool.call` hooks do.
+- `plugin.json`: removed `termsOfServiceUrl` (it pointed at the MIT license, which is not terms of service). `types` stays: it is a documented manifest field, and without it `claude plugin validate` 2.1.296 fails with four "is not declared" errors for the mod's state keys.
+
+### Removed from the shipped plugin
+- `docs/validation/` (the evidence-gated validation record) and `docs/SUBMISSION.md`. Both stay in git history at `765b8dc`.
+- A duplicate copy of the plugin icon image under `docs/images/`.
+
+### Added
+- A test that every request goes to the one Yahoo host with only a `User-Agent` header, whatever extra fields a tool call carries.
+
 ## [0.1.1] - 2026-10-10
 
 ### Fixed
@@ -12,8 +30,8 @@ All notable changes to this mod. Versions follow [Semantic Versioning](https://s
 - Docs corrected where validation refuted the wording: as-of times are on every price line (not error lines), polling also happens at session start and after `/watch` edits, `isDeferred: false` needs Claude Code 2.1.293+, and the measured tool definition size is 584 characters.
 
 ### Added
-- `PRIVACY.md`, a plugin icon (`.claude-plugin/icon.png`), screenshots and a how-to section in the README, and a README section for plugin-directory reviewers.
-- Evidence-gated validation report in `docs/validation/egv-2026-10-10/` (27 claims, two independent channels).
+- `PRIVACY.md`, a plugin icon image, screenshots and a how-to section in the README, and a README section for plugin-directory reviewers.
+- Evidence-gated validation report (27 claims, two independent channels); moved out of the shipped plugin in 0.1.2.
 
 ## [0.1.0] - 2026-10-09
 
